@@ -1,0 +1,8 @@
+name: RomeoPaperPlugin
+main: com.romeo.paper.RomeoPaperPlugin
+version: 1.0.0
+commands:
+  testplugin:
+    description: Runs the project test command.
+    usage: /testplugin
+    aliases: [tp]

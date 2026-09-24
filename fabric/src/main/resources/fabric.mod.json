@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "id": "romeo_fabric",
+  "version": "${version}",
+  "name": "Romeo Fabric",
+  "description": "Basic Fabric server template",
+  "authors": ["Romeo"],
+  "license": "MIT",
+  "environment": "server",
+  "entrypoints": {
+    "server": [
+      "com.romeo.fabric.RomeoFabricMod"
+    ]
+  },
+  "depends": {
+    "fabricloader": ">=0.15.0",
+    "minecraft": ">=1.20"
+  }
+}
