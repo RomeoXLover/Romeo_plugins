@@ -2,7 +2,24 @@ name: RomeoPaperPlugin
 main: com.romeo.paper.RomeoPaperPlugin
 version: 1.0.0
 commands:
-  testplugin:
-    description: Runs the project test command.
-    usage: /testplugin
-    aliases: [tp]
+  ping:
+    description: Shows your latency.
+  editmotd:
+    description: Changes the server list MOTD.
+    permission: plugin.admin
+  editplayers:
+    description: Changes displayed server player counts.
+    permission: plugin.admin
+  editicon:
+    description: Downloads and caches a server icon.
+    permission: plugin.admin
+  npc:
+    description: Manages ArmorStand-backed NPCs.
+    permission: plugin.admin
+  settings:
+    description: Opens the settings menu.
+    permission: ""
+permissions:
+  plugin.admin:
+    description: Allows server and NPC administration.
+    default: op

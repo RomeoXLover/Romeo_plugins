@@ -1,0 +1,5 @@
+server-list:
+  motd: "Romeo Server"
+  max-players: 20
+  online-players: null
+  cached-icon: null
