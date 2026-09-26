@@ -1,6 +1,7 @@
 package com.romeo.paper.services;
 
 import com.romeo.paper.NpcManager;
+import com.romeo.paper.input.InputManager;
 import org.bukkit.plugin.java.JavaPlugin;
 
 /**
@@ -15,6 +16,7 @@ public final class Services {
     private final IconService icon;
     private final PingService ping;
     private final NpcService npc;
+    private final InputManager input;
 
     public Services(JavaPlugin plugin, NpcManager npcManager) {
         this.config = new ConfigService(plugin);
@@ -23,6 +25,7 @@ public final class Services {
         this.icon = new IconService(plugin, config);
         this.ping = new PingService();
         this.npc = new NpcService(plugin, npcManager);
+        this.input = new InputManager(plugin);
     }
 
     public ConfigService config() {
@@ -47,5 +50,9 @@ public final class Services {
 
     public NpcService npc() {
         return npc;
+    }
+
+    public InputManager input() {
+        return input;
     }
 }

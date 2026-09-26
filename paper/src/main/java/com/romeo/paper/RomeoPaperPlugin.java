@@ -25,6 +25,8 @@ public final class RomeoPaperPlugin extends JavaPlugin {
         saveDefaultConfig();
         npcManager = new NpcManager(this);
         services = new Services(this, npcManager);
+        services.input().register();
+        getLogger().info("Input system registered.");
         npcManager.load();
         getLogger().info("NPC system loaded (" + npcManager.all().size() + " NPCs).");
         RomeoCommand command = new RomeoCommand(services);
@@ -60,6 +62,9 @@ public final class RomeoPaperPlugin extends JavaPlugin {
 
     @Override
     public void onDisable() {
+        if (services != null) {
+            services.input().unregister();
+        }
         if (npcManager != null) {
             npcManager.save();
         }
