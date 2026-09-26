@@ -2,16 +2,16 @@ package com.romeo.paper;
 
 import com.romeo.common.api.PluginLogger;
 import com.romeo.common.core.BasePluginLifecycle;
+import com.romeo.paper.services.Services;
+import org.bukkit.Bukkit;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
-import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
 
 public final class RomeoPaperPlugin extends JavaPlugin {
     private NpcManager npcManager;
-    private SettingsGUI settingsGUI;
-    private OptionsScreen optionsScreen;
+    private Services services;
     private final BasePluginLifecycle lifecycle = new BasePluginLifecycle(new PaperLogger()) {
         @Override
         protected String getName() {
@@ -21,32 +21,33 @@ public final class RomeoPaperPlugin extends JavaPlugin {
 
     @Override
     public void onEnable() {
+        getLogger().info("Starting...");
         saveDefaultConfig();
         npcManager = new NpcManager(this);
+        services = new Services(this, npcManager);
         npcManager.load();
-        settingsGUI = new SettingsGUI(this, npcManager);
-        optionsScreen = new OptionsScreen(this, settingsGUI, npcManager);
-        RomeoCommand command = new RomeoCommand(this, npcManager, settingsGUI, optionsScreen);
+        getLogger().info("NPC system loaded (" + npcManager.all().size() + " NPCs).");
+        RomeoCommand command = new RomeoCommand(services);
         getCommand("ping").setExecutor(command);
         getCommand("editmotd").setExecutor(command);
         getCommand("editplayers").setExecutor(command);
         getCommand("editicon").setExecutor(command);
         getCommand("npc").setExecutor(command);
         getCommand("settings").setExecutor(command);
-        Bukkit.getPluginManager().registerEvents(settingsGUI, this);
-        Bukkit.getPluginManager().registerEvents(optionsScreen, this);
-        Bukkit.getPluginManager().registerEvents(new ServerFeatureListener(this, npcManager), this);
+        getLogger().info("Commands registered.");
+        Bukkit.getPluginManager().registerEvents(
+                new ServerFeatureListener(this, npcManager, services.npc()), this);
         Bukkit.getScheduler().runTaskTimer(this, new Runnable() {
             @Override
             public void run() {
                 for (NpcData data : npcManager.all()) {
-                    if (!data.enabled || !data.look || npcManager.entity(data.name) == null) {
+                    if (!data.isEnabled() || !data.isLook() || npcManager.entity(data.getName()) == null) {
                         continue;
                     }
                     for (Player player : Bukkit.getOnlinePlayers()) {
-                        if (player.getWorld().getName().equals(data.world)
-                                && player.getLocation().distanceSquared(npcManager.entity(data.name).getLocation()) <= 100.0D) {
-                            NpcManager.lookAt(npcManager.entity(data.name), player);
+                        if (player.getWorld().getName().equals(data.getWorld())
+                                && player.getLocation().distanceSquared(npcManager.entity(data.getName()).getLocation()) <= 100.0D) {
+                            NpcManager.lookAt(npcManager.entity(data.getName()), player);
                             break;
                         }
                     }
@@ -54,11 +55,14 @@ public final class RomeoPaperPlugin extends JavaPlugin {
             }
         }, 10L, 10L);
         lifecycle.onEnable();
-        getLogger().info("Romeo Paper plugin enabled.");
+        getLogger().info("Ready.");
     }
 
     @Override
     public void onDisable() {
+        if (npcManager != null) {
+            npcManager.save();
+        }
         lifecycle.onDisable();
         getLogger().info("Romeo Paper plugin disabled.");
     }
@@ -66,6 +70,10 @@ public final class RomeoPaperPlugin extends JavaPlugin {
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         return false;
+    }
+
+    public Services services() {
+        return services;
     }
 
     private static final class PaperLogger implements PluginLogger {

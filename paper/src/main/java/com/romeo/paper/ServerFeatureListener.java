@@ -1,11 +1,9 @@
 package com.romeo.paper;
 
+import com.romeo.paper.services.NpcService;
 import org.bukkit.Bukkit;
-import org.bukkit.ChatColor;
 import org.bukkit.Location;
-import org.bukkit.Sound;
 import org.bukkit.entity.ArmorStand;
-import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -16,28 +14,32 @@ import org.bukkit.event.server.ServerListPingEvent;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.lang.reflect.Method;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
 
+/**
+ * Server-level features: server list (MOTD, counts, icon) and NPC click
+ * actions. Click-action execution is delegated to {@link NpcService} so the
+ * GUI "Test Action" button runs exactly the same code path.
+ */
 final class ServerFeatureListener implements Listener {
     private final JavaPlugin plugin;
     private final NpcManager npcManager;
+    private final NpcService npcService;
 
-    ServerFeatureListener(JavaPlugin plugin, NpcManager npcManager) {
+    ServerFeatureListener(JavaPlugin plugin, NpcManager npcManager, NpcService npcService) {
         this.plugin = plugin;
         this.npcManager = npcManager;
+        this.npcService = npcService;
     }
 
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onServerPing(ServerListPingEvent event) {
-        event.setMotd(plugin.getConfig().getString("server-list.motd", "Romeo Server"));
+        event.setMotd(LegacyText.colorize(plugin.getConfig().getString("server-list.motd", "Romeo Server")));
         event.setMaxPlayers(plugin.getConfig().getInt("server-list.max-players", event.getMaxPlayers()));
-        Integer online = getInteger(plugin.getConfig().get("server-list.online-players"));
-        if (online != null) {
-            invoke(event, "setNumPlayers", new Class<?>[]{int.class}, new Object[]{online});
+        Object online = plugin.getConfig().get("server-list.online-players");
+        if (online instanceof Number) {
+            invoke(event, "setNumPlayers", new Class<?>[]{int.class}, new Object[]{((Number) online).intValue()});
         }
-        Object icon = plugin.getDataFolder().getAbsolutePath().length() == 0 ? null : plugin.getConfig().get("server-list.cached-icon");
+        Object icon = plugin.getConfig().get("server-list.cached-icon");
         if (icon instanceof String) {
             try {
                 Object cached = Bukkit.getServer().loadServerIcon(new java.io.File((String) icon));
@@ -59,7 +61,7 @@ final class ServerFeatureListener implements Listener {
             String name = findName((ArmorStand) event.getRightClicked());
             if (name != null) {
                 event.setCancelled(true);
-                executeActions(event.getPlayer(), name, "rightclick");
+                npcService.executeActions(event.getPlayer(), name, "rightclick");
             }
         }
     }
@@ -70,56 +72,16 @@ final class ServerFeatureListener implements Listener {
             String name = findName((ArmorStand) event.getEntity());
             if (name != null) {
                 event.setCancelled(true);
-                executeActions((Player) event.getDamager(), name, "leftclick");
+                npcService.executeActions((Player) event.getDamager(), name, "leftclick");
             }
         }
     }
 
     private String findName(ArmorStand stand) {
         for (NpcData data : npcManager.all()) {
-            if (npcManager.entity(data.name) == stand) {
-                return data.name;
+            if (npcManager.entity(data.getName()) == stand) {
+                return data.getName();
             }
-        }
-        return null;
-    }
-
-    private void executeActions(Player player, String npcName, String click) {
-        NpcData data = npcManager.get(npcName);
-        if (data == null || !data.enabled) {
-            return;
-        }
-        List<String> actions = data.actions.get(click);
-        if (actions == null) {
-            return;
-        }
-        for (String raw : actions) {
-            int separator = raw.indexOf('|');
-            if (separator <= 0) {
-                continue;
-            }
-            String type = raw.substring(0, separator).toLowerCase(Locale.ENGLISH);
-            String value = raw.substring(separator + 1).replace("%player%", player.getName());
-            try {
-                if (type.equals("message")) {
-                    player.sendMessage(LegacyText.colorize(value));
-                } else if (type.equals("command")) {
-                    player.performCommand(value.startsWith("/") ? value.substring(1) : value);
-                } else if (type.equals("console")) {
-                    Bukkit.dispatchCommand(Bukkit.getConsoleSender(), value.startsWith("/") ? value.substring(1) : value);
-                } else if (type.equals("sound")) {
-                    Sound sound = Sound.valueOf(value.toUpperCase(Locale.ENGLISH));
-                    player.getWorld().playSound(npcManager.entity(npcName).getLocation(), sound, 1.0f, 1.0f);
-                }
-            } catch (Throwable exception) {
-                plugin.getLogger().warning("NPC action failed for " + npcName + ": " + exception.getMessage());
-            }
-        }
-    }
-
-    private static Integer getInteger(Object value) {
-        if (value instanceof Number) {
-            return ((Number) value).intValue();
         }
         return null;
     }
