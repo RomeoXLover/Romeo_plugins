@@ -21,6 +21,9 @@ jobs:
 
       - name: Set up Gradle cache
         uses: gradle/actions/setup-gradle@v3
+        with:
+          # Fabric Loom 1.7 is incompatible with Gradle 9; match the wrapper version
+          gradle-version: 8.10.2
 
       - name: Build
         run: bash ./gradlew build --console=plain --no-daemon
