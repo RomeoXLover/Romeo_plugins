@@ -7,7 +7,6 @@ import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.ArmorStand;
-import org.bukkit.entity.Entity;
 import org.bukkit.entity.EntityType;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
@@ -24,19 +23,23 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
-final class NpcManager {
+/**
+ * Storage + entity lifecycle for ArmorStand-backed NPCs. Persistence only —
+ * higher-level behavior lives in {@link com.romeo.paper.services.NpcService}.
+ */
+public final class NpcManager {
     private final JavaPlugin plugin;
     private final Map<String, NpcData> npcs = new LinkedHashMap<String, NpcData>();
     private final Map<String, ArmorStand> entities = new LinkedHashMap<String, ArmorStand>();
     private final File file;
     private FileConfiguration configuration;
 
-    NpcManager(JavaPlugin plugin) {
+    public NpcManager(JavaPlugin plugin) {
         this.plugin = plugin;
         this.file = new File(plugin.getDataFolder(), "npcs.yml");
     }
 
-    void load() {
+    public void load() {
         removeEntities();
         npcs.clear();
         if (!file.exists()) {
@@ -58,46 +61,47 @@ final class NpcManager {
                 continue;
             }
             NpcData data = new NpcData(key);
-            data.world = section.getString("world", "");
-            data.x = section.getDouble("x");
-            data.y = section.getDouble("y");
-            data.z = section.getDouble("z");
-            data.yaw = (float) section.getDouble("yaw");
-            data.pitch = (float) section.getDouble("pitch");
-            data.skin = section.getString("skin", "none");
-            data.displayName = section.getString("display-name");
-            data.nametag = section.getBoolean("nametag", true);
-            data.glow = section.getBoolean("glow", false);
-            data.look = section.getBoolean("look", false);
-            data.enabled = section.getBoolean("enabled", true);
-            data.actions.get("rightclick").addAll(section.getStringList("actions.rightclick"));
-            data.actions.get("leftclick").addAll(section.getStringList("actions.leftclick"));
+            data.loadFrom(
+                    section.getString("world", ""),
+                    section.getDouble("x"),
+                    section.getDouble("y"),
+                    section.getDouble("z"),
+                    (float) section.getDouble("yaw"),
+                    (float) section.getDouble("pitch"),
+                    section.getString("skin", "none"),
+                    section.getString("display-name"),
+                    section.getBoolean("nametag", true),
+                    section.getBoolean("glow", false),
+                    section.getBoolean("look", false),
+                    section.getBoolean("enabled", true),
+                    section.getStringList("actions.rightclick"),
+                    section.getStringList("actions.leftclick"));
             npcs.put(normalize(key), data);
-            if (data.enabled) {
+            if (data.isEnabled()) {
                 spawn(data);
             }
         }
     }
 
-    void save() {
+    public void save() {
         configuration = new YamlConfiguration();
         ConfigurationSection root = configuration.createSection("npcs");
         for (NpcData data : npcs.values()) {
-            ConfigurationSection section = root.createSection(data.name);
-            section.set("world", data.world);
-            section.set("x", data.x);
-            section.set("y", data.y);
-            section.set("z", data.z);
-            section.set("yaw", data.yaw);
-            section.set("pitch", data.pitch);
-            section.set("skin", data.skin);
-            section.set("display-name", data.displayName);
-            section.set("nametag", data.nametag);
-            section.set("glow", data.glow);
-            section.set("look", data.look);
-            section.set("enabled", data.enabled);
-            section.set("actions.rightclick", data.actions.get("rightclick"));
-            section.set("actions.leftclick", data.actions.get("leftclick"));
+            ConfigurationSection section = root.createSection(data.getName());
+            section.set("world", data.getWorld());
+            section.set("x", data.getX());
+            section.set("y", data.getY());
+            section.set("z", data.getZ());
+            section.set("yaw", data.getYaw());
+            section.set("pitch", data.getPitch());
+            section.set("skin", data.getSkin());
+            section.set("display-name", data.getDisplayName());
+            section.set("nametag", data.isNametag());
+            section.set("glow", data.isGlow());
+            section.set("look", data.isLook());
+            section.set("enabled", data.isEnabled());
+            section.set("actions.rightclick", data.getActions("rightclick"));
+            section.set("actions.leftclick", data.getActions("leftclick"));
         }
         try {
             configuration.save(file);
@@ -106,7 +110,7 @@ final class NpcManager {
         }
     }
 
-    NpcData create(String name, Location location) {
+    public NpcData create(String name, Location location) {
         String key = normalize(name);
         if (npcs.containsKey(key)) {
             return null;
@@ -118,7 +122,7 @@ final class NpcManager {
         return data;
     }
 
-    boolean remove(String name) {
+    public boolean remove(String name) {
         String key = normalize(name);
         NpcData removed = npcs.remove(key);
         if (removed == null) {
@@ -128,37 +132,37 @@ final class NpcManager {
         return true;
     }
 
-    NpcData get(String name) {
+    public NpcData get(String name) {
         return npcs.get(normalize(name));
     }
 
-    Collection<NpcData> all() {
+    public Collection<NpcData> all() {
         return npcs.values();
     }
 
-    ArmorStand entity(String name) {
+    public ArmorStand entity(String name) {
         return entities.get(normalize(name));
     }
 
-    void move(String name, Location location) {
+    public void move(String name, Location location) {
         NpcData data = get(name);
         if (data != null) {
             updateLocation(data, location);
             ArmorStand stand = entities.get(normalize(name));
             if (stand != null) {
                 stand.teleport(location);
-            } else if (data.enabled) {
+            } else if (data.isEnabled()) {
                 spawn(data);
             }
         }
     }
 
-    void setEnabled(String name, boolean enabled) {
+    public void setEnabled(String name, boolean enabled) {
         NpcData data = get(name);
         if (data == null) {
             return;
         }
-        data.enabled = enabled;
+        data.setEnabled(enabled);
         if (enabled) {
             spawn(data);
         } else {
@@ -167,22 +171,22 @@ final class NpcManager {
     }
 
     private void spawn(NpcData data) {
-        World world = Bukkit.getWorld(data.world);
+        World world = Bukkit.getWorld(data.getWorld());
         if (world == null) {
-            plugin.getLogger().warning("World not loaded for NPC " + data.name + ": " + data.world);
+            plugin.getLogger().warning("World not loaded for NPC " + data.getName() + ": " + data.getWorld());
             return;
         }
-        removeEntity(normalize(data.name));
-        Location location = new Location(world, data.x, data.y, data.z, data.yaw, data.pitch);
+        removeEntity(normalize(data.getName()));
+        Location location = new Location(world, data.getX(), data.getY(), data.getZ(), data.getYaw(), data.getPitch());
         ArmorStand stand = (ArmorStand) world.spawnEntity(location, EntityType.ARMOR_STAND);
         stand.setVisible(false);
         stand.setGravity(false);
-        stand.setCustomNameVisible(data.nametag);
-        stand.setCustomName(LegacyText.colorize(data.displayName == null ? data.name : data.displayName));
+        stand.setCustomNameVisible(data.isNametag());
+        stand.setCustomName(LegacyText.colorize(data.getDisplayName() == null ? data.getName() : data.getDisplayName()));
         tryInvoke(stand, "setMarker", new Class<?>[]{boolean.class}, new Object[]{true});
-        tryInvoke(stand, "setGlowing", new Class<?>[]{boolean.class}, new Object[]{data.glow});
-        applySkin(stand, data.skin);
-        entities.put(normalize(data.name), stand);
+        tryInvoke(stand, "setGlowing", new Class<?>[]{boolean.class}, new Object[]{data.isGlow()});
+        applySkin(stand, data.getSkin());
+        entities.put(normalize(data.getName()), stand);
     }
 
     private void applySkin(ArmorStand stand, String skinName) {
@@ -225,12 +229,8 @@ final class NpcManager {
     }
 
     private void updateLocation(NpcData data, Location location) {
-        data.world = location.getWorld().getName();
-        data.x = location.getX();
-        data.y = location.getY();
-        data.z = location.getZ();
-        data.yaw = location.getYaw();
-        data.pitch = location.getPitch();
+        data.setLocation(location.getWorld().getName(), location.getX(), location.getY(), location.getZ(),
+                location.getYaw(), location.getPitch());
     }
 
     private static String normalize(String name) {
@@ -252,5 +252,18 @@ final class NpcManager {
         float yaw = (float) Math.toDegrees(Math.atan2(-x, z));
         from.setYaw(yaw);
         stand.teleport(from);
+    }
+
+    /** Reflection helper shared with the services layer. */
+    public static void invoke(Object target, String name, Class<?>[] types, Object[] values) throws Exception {
+        target.getClass().getMethod(name, types).invoke(target, values);
+    }
+
+    /** Reflection helper that never throws; used for version-specific API. */
+    public static void invokeIfPresent(Object target, String name, Class<?>[] types, Object[] values) {
+        try {
+            invoke(target, name, types, values);
+        } catch (Throwable ignored) {
+        }
     }
 }
